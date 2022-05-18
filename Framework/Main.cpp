@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
+#include <windows.h>
 #include <string>
 
 using namespace std;
@@ -33,28 +34,89 @@ struct Transnsform
 
 struct Object
 {
-	char* Name;
+	char* Texture;
 	int Speed;
 	Transnsform TransInfo;
 };
 
-void Initialize(Object* _Object, char* _Name, int _PosX, int _PosY, int _PosZ);
+void Initialize(Object* _Object, char* _Name, int _PosX, int _PosY);
 char* SetName();
-void Output(Object* _Object);
+void SetCursorPosition(int _x, int _y);
+// ** 텍스트의 색을 변경함.
+void SetTextColor(int _Color);
+// ** 출력할 Text의 위치와 색상을 변경해준다. [Color 값은 기본값 : 흰색(15)]
+void OnDrawText(char* _str, int _x, int _y, int _Color = 15);
+// ** 출력할 숫자의 위치와 색상을 변경해준다. [Color 값은 기본값 : 흰색(15)]
+void OnDrawText(int _Value, int _x, int _y, int _Color = 15);
+// ** 커서를 보이거나(true)/안보이게(false) 만들어줌.
+void HideCursor(bool _Visible);
 
 
 int main(void)
 {
+	HideCursor(false);
 	//Object* Player = nullptr;
 	Object* Player = new Object;
-	Initialize(Player,nullptr,10,20,30);
+	Initialize(Player,nullptr,50,10);
 
 	Object* Enemy = new Object;
-	Initialize(Enemy,(char*)"Enemy",100,200,300);
+	Initialize(Enemy,(char*)"Enemy",80,10);
 
+	// ** 현재 시간으로 초기화.
+	ULONGLONG Time = GetTickCount64();
 
-	Output(Player);
-	Output(Enemy);
+	while (true)
+	{
+
+		// ** 할당받은 시간으로부터 +50 만큼 증가하면...
+		// ** (프레임과 프레임 사이의 시간 간격을 0.5초로 셋팅)
+		if (Time + 50 < GetTickCount64())
+		{
+			// ** 증가된 값만큼 다시 초기화.
+			Time = GetTickCount64();
+
+			//** 콘솔창 버퍼 전체 삭제
+			system("cls");
+
+			//**[상] 키를 입력받음.
+			if (GetAsyncKeyState(VK_UP))
+				Player->TransInfo.Position.y -= 1;
+			//**[하] 키를 입력받음.
+			if (GetAsyncKeyState(VK_DOWN))
+				Player->TransInfo.Position.y += 1;
+			//**[좌] 키를 입력받음.
+			if (GetAsyncKeyState(VK_LEFT))
+				Player->TransInfo.Position.x -= 1;
+			//**[우] 키를 입력받음.
+			if (GetAsyncKeyState(VK_RIGHT))
+				Player->TransInfo.Position.x += 1;
+			//**[Space] 키를 입력받음.
+			if (GetAsyncKeyState(VK_SPACE))
+			{
+				OnDrawText((char*)"장풍!!",
+				Player->TransInfo.Position.x + strlen(Player->Texture) + 1,
+				Player->TransInfo.Position.y,
+				13);
+			}
+				
+
+			OnDrawText(Player->Texture,
+				Player->TransInfo.Position.x,
+				Player->TransInfo.Position.y,
+				10);
+			OnDrawText(Enemy->Texture,
+				Enemy->TransInfo.Position.x,
+				Enemy->TransInfo.Position.y,
+				12);
+			
+			OnDrawText((char*)"Score : ", 60 - strlen("Score : "), 1);
+			OnDrawText(++Score, 60, 1);
+		}
+		
+	}
+		
+		
+	//Output(Enemy);
 
 	/*Vector3 vPosition = Vector3(10,20);		// 초기화 변수를 2개 호출하면 매개변수 2개짜리 복사생성자가 자동 호출 , 3개는 3개짜리가 자동호출
 	
@@ -68,7 +130,7 @@ int main(void)
 
 void Initialize(Object* _Object, char* _Name, int _PosX, int _PosY, int _PosZ)
 {
-	_Object->Name = (_Name == nullptr) ? SetName() : _Name;
+	_Object->Texture = (_Name == nullptr) ? SetName() : _Name;
 
 
 	_Object->Speed = 0;
@@ -89,17 +151,49 @@ char* SetName()
 
 	strcpy(pName, Buffer);
 
-	return nullptr;
+	return pName;
 }
 
-void Output(Object* _Object)
+void SetCursorPosition(int _x, int _y)
 {
-	if (_Object->Name != nullptr)
-		cout << "Name : " << _Object->Name << endl;
+	COORD Pos = {(SHORT)_x,(SHORT)_y};
 
-	cout << "Speed : " << _Object->Speed << endl;
+	SetConsoleCursorPosition(
+		GetStdHandle(STD_OUTPUT_HANDLE), Pos);
+}
 
-	cout << "X : " << _Object->TransInfo.Position.x <<
-		", Y : " << _Object->TransInfo.Position.y <<
-		", Z : " << _Object->TransInfo.Position.z << endl;
+void SetTextColor(int _Color)
+{
+	SetConsoleTextAttribute(
+		GetStdHandle(STD_OUTPUT_HANDLE), _Color);
+}
+
+void OnDrawText(char* _str, int _x, int _y, int _Color)
+{
+	SetCursorPosition(_x, _y);
+	SetTextColor(_Color);
+	cout << _str;
+}
+
+void OnDrawText(int _Value, int _x, int _y, int _Color)
+{
+	SetCursorPosition(_x, _y);
+	SetTextColor(_Color);
+	
+	char* pText = new char[4];
+	_itoa(_Value, pText, 10);
+	cout << _Value;
+}
+
+void HideCursor(bool _Visible)
+{
+	CONSOLE_CURSOR_INFO CursorInfo;
+
+	CursorInfo.bVisible = _Visible;
+	CursorInfo.dwSize = 1;
+
+	SetConsoleCursorInfo(
+		GetStdHandle(STD_OUTPUT_HANDLE), &CursorInfo);
+
+
 }
