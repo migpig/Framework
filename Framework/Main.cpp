@@ -1,199 +1,170 @@
-#define _CRT_SECURE_NO_WARNINGS
-#include <iostream>
-#include <windows.h>
-#include <string>
-
-using namespace std;
+// ** Framework v0.4.3
+// ** 숙제 : Bullet & Enemy 충돌 구현.
+#include "Headers.h"
 
 
 
 
-struct Vector3 
-{
-	int x = 0, y = 0, z = 0;
 
-	Vector3() {};							//기본 생성자 없이 복사 생성자를 만들수 없다.
-
-	Vector3(int _x, int _y)
-		: x(_x), y(_y), z(0) {};			//복사 생성자를 여러개 만들수도 있다. 매개변수 2개 여기서 z는 초기화 안해 줄 수 없으니 임의값
-
-	Vector3(int _x, int _y, int _z)
-		: x(_x), y(_y), z(_z) {};			//복사 생성자를 만들때 기본 생성자를 무조건 정의 해줘야한다. 매개변수 3개
-	
-	/* tagVector3(int _x, int _y, float _z) 매개변수의 형태에 따라서 호출되는 복사생성자가 달라짐
-		: x(_x), y(_y), z(_z) {}; */
-};											//vector3은 x 수평 y 수직 z 외적을했을때 생기는 하나의 선 3개의 원소로 이루어져있다.
-											//3d = vector3 2d = vector2
-
-struct Transnsform
-{
-	Vector3 Position;
-	Vector3 Rotation;
-	Vector3 Scale;
-};
-
-struct Object
-{
-	char* Texture;
-	int Speed;
-	Transnsform TransInfo;
-};
-
-void Initialize(Object* _Object, char* _Name, int _PosX, int _PosY);
-char* SetName();
-void SetCursorPosition(int _x, int _y);
-// ** 텍스트의 색을 변경함.
-void SetTextColor(int _Color);
-// ** 출력할 Text의 위치와 색상을 변경해준다. [Color 값은 기본값 : 흰색(15)]
-void OnDrawText(char* _str, int _x, int _y, int _Color = 15);
-// ** 출력할 숫자의 위치와 색상을 변경해준다. [Color 값은 기본값 : 흰색(15)]
-void OnDrawText(int _Value, int _x, int _y, int _Color = 15);
-// ** 커서를 보이거나(true)/안보이게(false) 만들어줌.
-void HideCursor(bool _Visible);
-
-
+// ** 진입점.	
 int main(void)
 {
+	// ** 커서를 안보이게 만들어줌.
 	HideCursor(false);
-	//Object* Player = nullptr;
-	Object* Player = new Object;
-	Initialize(Player,nullptr,50,10);
 
+
+	// ** 배경 초기화.
+	DrawTextInfo BackGround[30];
+
+	for (int i = 0; i < 30; ++i)
+	{
+		// ** 랜덤값을 초기화 해줌. 큰 값이 나올수 있도록 Time값끼리 곱해줄 것이지만, 
+		// ** for문이 빠르게 돌게되면 Time의 증가값보다 빠를수 있기때문에,
+		// ** 랜덤값이라고 하더라도 연속으로 같은 값이 나올수 있음.
+		// ** i의 값을 곱하고 더해줌으로써 같은 값이 나오지 않도록 해줌.
+		srand((GetTickCount() + i * i) * GetTickCount());
+
+
+		// ** 현재 어떻게 사용할지 정하지 않았지만, 추후 배경과 총알을 구분지어 플레이어가 배경과 다았을때에는 충돌하지 않고,
+		// ** 총알과 다았을 때에만 충돌판정이 되도록 설정해줄 것임.
+		BackGround[i].Info.Option = 0;
+
+		// ** 좌표를 랜덤으로 설정함.
+		BackGround[i].TransInfo.Position.x = rand() % 100 + 10;
+		BackGround[i].TransInfo.Position.y = rand() % 26 + 1;
+
+		// ** 배경으로 사용될 텍스처를 설정.
+		BackGround[i].Info.Texture = (char*)"*";
+
+		// ** 배경으로 사용될 텍스처의 색상을 랜덤으로 설정.
+		BackGround[i].Info.Color = rand() % 8 + 1;
+	}
+
+
+	// ** 플레이어 선언 및 동적할당.
+	Object* Player = new Object;
+
+	// ** 플레이어 초기화
+	Initialize(Player, (char*)"옷/", 30, 10);
+
+	// ** Enemy선언 및 동적할당.
 	Object* Enemy = new Object;
-	Initialize(Enemy,(char*)"Enemy",80,10);
+
+	// ** Enemy 초기화
+	Initialize(Enemy, (char*)"홋", 80, 10);
 
 	// ** 현재 시간으로 초기화.
 	ULONGLONG Time = GetTickCount64();
 
+	int Score = 0;
+
+	// ** Bullet
+	Object* Bullet[128] = { nullptr };
+
+	int BulletCount = 0;
+
+	// ** 출력
 	while (true)
 	{
-
-		// ** 할당받은 시간으로부터 +50 만큼 증가하면...
-		// ** (프레임과 프레임 사이의 시간 간격을 0.5초로 셋팅)
-		if (Time + 50 < GetTickCount64())
+		// ** 초기화된 시간으로부터 +50 만큼 증가하면...
+		// ** (프레임과 프레임사이의 시간 간격을 0.5초로 셋팅)
+		if (Time + 80 < GetTickCount64())
 		{
 			// ** 증가된 값만큼 다시 초기화.
 			Time = GetTickCount64();
 
-			//** 콘솔창 버퍼 전체 삭제
+			// ** 콘솔창 버퍼 전체 삭제
 			system("cls");
 
-			//**[상] 키를 입력받음.
-			if (GetAsyncKeyState(VK_UP))
-				Player->TransInfo.Position.y -= 1;
-			//**[하] 키를 입력받음.
-			if (GetAsyncKeyState(VK_DOWN))
-				Player->TransInfo.Position.y += 1;
-			//**[좌] 키를 입력받음.
-			if (GetAsyncKeyState(VK_LEFT))
-				Player->TransInfo.Position.x -= 1;
-			//**[우] 키를 입력받음.
-			if (GetAsyncKeyState(VK_RIGHT))
-				Player->TransInfo.Position.x += 1;
-			//**[Space] 키를 입력받음.
-			if (GetAsyncKeyState(VK_SPACE))
+			// ** 배경 출력
+			for (int i = 0; i < 30; ++i)
 			{
-				OnDrawText((char*)"장풍!!",
-				Player->TransInfo.Position.x + strlen(Player->Texture) + 1,
-				Player->TransInfo.Position.y,
-				13);
-			}
-				
+				OnDrawText(
+					BackGround[i].Info.Texture,
+					BackGround[i].TransInfo.Position.x,
+					BackGround[i].TransInfo.Position.y,
+					BackGround[i].Info.Color);
 
-			OnDrawText(Player->Texture,
+				// ** 배경으로 사용될 텍스처의 색상을 랜덤으로 설정.
+				BackGround[i].Info.Color = rand() % 8 + 1;
+			}
+
+
+
+			for (int i = 0; i < 128; ++i)
+			{
+				if (Bullet[i] != nullptr)
+				{
+					if ((Bullet[i]->TransInfo.Position.x + Bullet[i]->TransInfo.Scale.x) >= 120)
+					{
+						delete Bullet[i];
+						Bullet[i] = nullptr;
+
+						--BulletCount;
+					}
+				}
+			}
+
+			Collision(Player, Enemy);
+
+			UpdateInput(Player);
+
+
+
+			// ** [Space] 키를 입력받음.
+			if (GetAsyncKeyState(VK_SPACE))
+				for (int i = 0; i < 128; ++i)
+				{
+					if (Bullet[i] == nullptr)
+					{
+						Bullet[i] = CreateBullet(
+							Player->TransInfo.Position.x,
+							Player->TransInfo.Position.y);
+						++BulletCount;
+						break;
+					}
+				}
+
+			OnDrawText(Player->Info.Texture,
 				Player->TransInfo.Position.x,
 				Player->TransInfo.Position.y,
 				10);
-			OnDrawText(Enemy->Texture,
+
+			OnDrawText(Enemy->Info.Texture,
 				Enemy->TransInfo.Position.x,
 				Enemy->TransInfo.Position.y,
 				12);
-			
+
+			// ** Bullet 출력
+			for (int i = 0; i < 128; ++i)
+			{
+				if (Bullet[i])
+				{
+					Bullet[i]->TransInfo.Position.x += 2;
+
+					OnDrawText(Bullet[i]->Info.Texture,
+						Bullet[i]->TransInfo.Position.x,
+						Bullet[i]->TransInfo.Position.y);
+				}
+			}
+
+			OnDrawText((char*)"Bullet Count : ", 95, 1);
+			OnDrawText(BulletCount, 95 + strlen("Bullet Count : "), 1);
+
 			OnDrawText((char*)"Score : ", 60 - strlen("Score : "), 1);
 			OnDrawText(++Score, 60, 1);
 		}
-		
 	}
-		
-		
-	//Output(Enemy);
-
-	/*Vector3 vPosition = Vector3(10,20);		// 초기화 변수를 2개 호출하면 매개변수 2개짜리 복사생성자가 자동 호출 , 3개는 3개짜리가 자동호출
-	
-	cout << vPosition.x << ", " << vPosition.y << endl;*/
-
-
 
 	return 0;
 }
 
 
-void Initialize(Object* _Object, char* _Name, int _PosX, int _PosY, int _PosZ)
-{
-	_Object->Texture = (_Name == nullptr) ? SetName() : _Name;
 
-
-	_Object->Speed = 0;
-
-	_Object->TransInfo.Position = Vector3(_PosX, _PosY, _PosZ);
-	_Object->TransInfo.Rotation = Vector3(0, 0, 0);
-	_Object->TransInfo.Scale = Vector3(0, 0, 0);
-}
-
-char* SetName()
-{
-	char Buffer[128] = "";
-	
-	cout << "입력 : ";
-	cin >> Buffer;
-	//char* pName = (char*)malloc(strlen(Buffer) + 1);
-	char* pName = new char[strlen(Buffer) + 1];
-
-	strcpy(pName, Buffer);
-
-	return pName;
-}
-
-void SetCursorPosition(int _x, int _y)
-{
-	COORD Pos = {(SHORT)_x,(SHORT)_y};
-
-	SetConsoleCursorPosition(
-		GetStdHandle(STD_OUTPUT_HANDLE), Pos);
-}
-
-void SetTextColor(int _Color)
-{
-	SetConsoleTextAttribute(
-		GetStdHandle(STD_OUTPUT_HANDLE), _Color);
-}
-
-void OnDrawText(char* _str, int _x, int _y, int _Color)
-{
-	SetCursorPosition(_x, _y);
-	SetTextColor(_Color);
-	cout << _str;
-}
-
-void OnDrawText(int _Value, int _x, int _y, int _Color)
-{
-	SetCursorPosition(_x, _y);
-	SetTextColor(_Color);
-	
-	char* pText = new char[4];
-	_itoa(_Value, pText, 10);
-	cout << _Value;
-}
-
-void HideCursor(bool _Visible)
-{
-	CONSOLE_CURSOR_INFO CursorInfo;
-
-	CursorInfo.bVisible = _Visible;
-	CursorInfo.dwSize = 1;
-
-	SetConsoleCursorInfo(
-		GetStdHandle(STD_OUTPUT_HANDLE), &CursorInfo);
-
-
-}
+// ** 게이지 (월 : 예정)
+//  [           \\]
+//  [         \\\\]
+//  [      \\\\\\\]
+//  [    \\\\\\\\\]
+//  [  \\\\\\\\\\\]
+//  [\\\\\\\\\\\\\]
